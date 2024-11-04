@@ -1,96 +1,100 @@
-import os
+import os        #os — для роботи з файлами і шляхами в операційній системі.
 import zipfile
-import gzip
+import gzip      #для роботи з архівами zip,gzip,bzip2,lzma
 import bz2
 import lzma
-#Цей блок імпортує модулі, які забезпечують роботу з різними типами архівів:
-# os — для роботи з операційною системою, зокрема шляхами до файлів.
-# zipfile — для розпакування ZIP-архівів.
-# gzip — для розпакування GZIP-архівів.
-# bz2 — для розпакування BZIP2-архівів.
-# lzma — для роботи з LZMA та XZ-архівами.
-
-
-
-def decompress_zip(source_file: str, output_dir: str):
-    # Відкриваємо ZIP-файл і витягуємо всі файли у вказану директорію
-    with zipfile.ZipFile(source_file, 'r') as archive:
-        archive.extractall(output_dir)
-    print(f"File decompressed to {output_dir}")
-    return None
-# Ця функція отримує шлях до ZIP-архіву (source_file) і шлях до
-# вихідної директорії (output_dir). Відкривається ZIP-архів (with zipfile) у режимі читання
-# ('r') і всі файли розпаковуються в задану директорію. Після цього виводиться повідомлення
-# про успішне розпакування.
+from datetime import datetime
+import argparse    #argparse — для обробки параметрів командного рядка.
 
 
 
 
-# Функція для розпакування GZIP-архівів
+def add_timestamp(file_name: str) -> str:
+    """Adds a timestamp to the file name.""" #Додає мітку часу до імені файлу.
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S") #створює мітку часу у форматі
+    base, ext = os.path.splitext(file_name) #os.path.splitext(file_name) — розбиває ім'я файлу на дві частини:
+    # назва файлу (base) та розширення (ext).
+    return f"{base}_{timestamp}{ext}" #Повертає нове ім'я файлу у вигляді base_timestamp.ext, де timestamp — наша мітка часу.
+
+
+
+
+def decompress_zip(source_file: str, output_dir: str):#source_file: шлях до GZIP-архіву
+                                     #output_dir: папка, куди буде збережений розпакований файл.
+    """Decompress ZIP archives with a timestamp added to extracted files.""" #Розпаковує ZIP-архів і додає мітку часу
+    # до кожного розпакованого файлу.
+    with zipfile.ZipFile(source_file, 'r') as archive: #відкриває ZIP-файл для читання(режим читання r).
+        for member in archive.namelist(): #archive.namelist() повертає список всіх файлів та папок у ZIP-архіві.
+            original_name = os.path.basename(member)#os.path.basename(member) виділяє лише ім'я файлу з повного шляху.
+            # Наприклад, якщо member дорівнює "folder/subfolder/file.txt", то os.path.basename(member) поверне "file.txt".
+            if original_name:  # avoid directories   #Якщо original_name містить назву, тоді елемент є файлом, а не папкою.
+                new_name = add_timestamp(original_name) #додає мітку пасу до імені файлу
+                archive.extract(member, output_dir) #Розпаковка файлу у вказану директорію(output_dir)
+                os.rename(os.path.join(output_dir, member), os.path.join(output_dir, new_name))
+                #os.path.join(output_dir, member) створює повний шлях до розпакованого файлу у вихідній папці.
+#os.path.join(output_dir, new_name) створює новий шлях для файлу з міткою часу.
+#os.rename(...) перейменовує файл з оригінальної назви на нову з доданою міткою часу.
+                print(f"ZIP file decompressed to {output_dir}")
+
 def decompress_gzip(source_file: str, output_dir: str):
-    output_file = os.path.join(output_dir, os.path.basename(source_file).replace('.gz', ''))
-    #os.path.join(output_dir, ...) об'єднує шлях до вихідної директорії з назвою файлу
-    #без розширення, щоб отримати повний шлях до вихідного файлу.
-    #(replace)Визначаємо назву вихідного файлу без розширення .gz
-    #os.path.basename(source_file) отримує назву файлу з повного шляху(source_file).
-
-    # Відкриваємо вхідний GZIP-файл для читання і вихідний файл для запису
+    """Decompress GZIP archives with a timestamp added to extracted file.""" #Розпаковує GZIP-архів і додає мітку часу
+    # до імені розпакованого файл
+    output_file = os.path.join(output_dir, add_timestamp(os.path.basename(source_file).replace('.gz', '')))
+    #os.path.join(output_dir, ...): об'єднує папку output_dir з новим ім'ям файлу, створюючи повний шлях до розпакованого файлу.
+    #add_timestamp(...): додає мітку часу до імені файлу.
+    #os.path.basename(source_file): отримує тільки ім'я файлу без шляху.
+    #.replace('.gz', ''): прибирає розширення .gz
     with gzip.open(source_file, 'rb') as f_in, open(output_file, 'wb') as f_out:
-        #gzip.open(source_file, 'rb') відкриває архів source_file у режимі читання байтів
-        #f_in.read() читає всі байти з вхідного архівного файлу.
-        #open(output_file, 'wb') відкриває файл output_file у режимі запису байтів
-        f_out.write(f_in.read())  #f_out.write(...) записує ці байти у вихідний файл
-    # Повідомляємо користувача про успішне розпакування
-    print(f"File decompressed to {output_dir}")
-    return None
-#(Ця функція розпаковує файл формату .bz2 до вказаної директорії.
-# Спочатку вона визначає ім’я вихідного файлу без розширення .bz2,
-# відкриває архів для читання, створює новий файл для запису та копіює вміст із
-# архіву у вихідний файл. Потім повідомляє користувача про успішну операцію.)
+        #gzip.open(source_file, 'rb'): відкриває архівний файл source_file у режимі читання байтів ('rb' — read binary)
+        #open(output_file, 'wb'): створює новий файл у папці output_dir з іменем output_file у режимі запису байтів ('wb' — write binary).
+        #as f_in, open(...) as f_out: вказує, що f_in — це вхідний файл (архів), а f_out — вихідний файл (розпакований файл).
+        f_out.write(f_in.read())
+        #f_in.read(): читає всі дані з архіву source_file.
+        #f_out.write(...): записує ці дані у новий файл output_file, розпаковуючи їх.
+    print(f"GZIP file decompressed to {output_dir}")
 
 
 
 
-# Функція для розпакування BZIP2-архівів
 def decompress_bzip2(source_file: str, output_dir: str):
-    # Визначаємо назву вихідного файлу без розширення .bz2
-    output_file = os.path.join(output_dir, os.path.basename(source_file).replace('.bz2', ''))
-    # Відкриваємо вхідний BZIP2-файл для читання і вихідний файл для запису
+    """Decompress BZIP2 archives with a timestamp added to extracted file."""
+    output_file = os.path.join(output_dir, add_timestamp(os.path.basename(source_file).replace('.bz2', '')))
     with bz2.open(source_file, 'rb') as f_in, open(output_file, 'wb') as f_out:
-        f_out.write(f_in.read())  # Записуємо вміст у вихідний файл
-    # Повідомляємо користувача про успішне розпакування
-    print(f"File decompressed to {output_dir}")
-    return None
-#теж саме що і у попередній функції але обробляється файл із
-#розширенням .bz2 за допомогою бібліотеки bz2.
+        f_out.write(f_in.read())
+    print(f"BZIP2 file decompressed to {output_dir}")
 
 
 
 
-# Функція для розпакування LZMA/XZ-архівів
 def decompress_xz(source_file: str, output_dir: str):
-    # Визначаємо назву вихідного файлу без розширення .xz
-    output_file = os.path.join(output_dir, os.path.basename(source_file).replace('.xz', ''))
-    # Відкриваємо вхідний LZMA/XZ-файл для читання і вихідний файл для запису
+    """Decompress LZMA/XZ archives with a timestamp added to extracted file."""
+    output_file = os.path.join(output_dir, add_timestamp(os.path.basename(source_file).replace('.xz', '')))
     with lzma.open(source_file, 'rb') as f_in, open(output_file, 'wb') as f_out:
-        f_out.write(f_in.read())  # Записуємо вміст у вихідний файл
-    # Повідомляємо користувача про успішне розпакування
-    print(f"File decompressed to {output_dir}")
-    return None
-#Виконує аналогічні операції, але використовує бібліотеку
-# lzma для роботи з архівами формату LZMA та XZ.
+        f_out.write(f_in.read())
+    print(f"LZMA/XZ file decompressed to {output_dir}")
 
 
 
-# Основна функція, що визначає тип архіву і викликає відповідну функцію розпакування
+
 def main():
-    # Отримуємо шлях до архіву і вихідної директорії від користувача
-    source_file = input("Source file: ")
-    output_dir = input("Output directory: ")
-    # Визначаємо тип архіву за його розширенням
+    parser = argparse.ArgumentParser(description="Decompress different types of archives with a timestamp.")
+    #argparse.ArgumentParser(...) створює об’єкт parser, який обробляє параметри, введені в командному рядку.
+    #description="..." додає опис до parser
+    parser.add_argument("source_file", help="Path to the archive file")
+    parser.add_argument("output_dir", help="Directory where files will be extracted")
+    #parser.add_argument(...) додає два обов’язкові параметри командного рядка:
+    #"source_file": шлях до архівного файлу, який потрібно розпакувати.
+    #"output_dir": папка, в яку будуть розпаковані файли.
+    #help="..." надає короткий опис для кожного параметра, щоб користувачі розуміли, що саме потрібно ввести.
+    args = parser.parse_args()
+    #parser.parse_args() зчитує параметри, які ввів користувач, і зберігає їх у об’єкті args.
+    source_file = args.source_file
+    output_dir = args
+    #source_file отримує значення шляху до архіву з args.source_file.
+    #output_dir отримує значення папки для розпакованих файлів з args.output_dir.
+      # Determine the archive type by its extension
     archive_type = source_file.split('.')[-1].lower()
-
-    # Викликаємо відповідну функцію залежно від типу архіву
+    # Call the appropriate function based on the archive type
     if archive_type == "zip":
         decompress_zip(source_file, output_dir)
     elif archive_type == "gz":
@@ -100,10 +104,7 @@ def main():
     elif archive_type == "xz":
         decompress_xz(source_file, output_dir)
     else:
-        # Виводимо повідомлення, якщо формат архіву не підтримується
         print("Unsupported archive type")
 
-
-# Точка входу в програму
 if __name__ == "__main__":
     main()
